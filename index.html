@@ -133,8 +133,8 @@
             statusText.innerText = "Analyzing Audio...";
 
             try {
-                // REPLACE THE PLACEHOLDER URL BELOW WITH YOUR LIVE RENDER BACKEND ADRESS:
-                const response = await fetch('https://onrender.com', {
+                // Uses a relative endpoint so it dynamically speaks to the hosting domain automatically
+                const response = await fetch('/api/jarvis/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: userText })
@@ -147,7 +147,7 @@
                 speak(data.response);
             } catch (error) {
                 statusText.innerText = "Core Connection Failure";
-                logText.innerText = "Could not reach global server cloud cluster.";
+                logText.innerText = "Could not locate live API service pipeline backend routes.";
                 console.error(error);
             }
         };
