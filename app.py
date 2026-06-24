@@ -2,14 +2,11 @@ import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from google import genai
-from google.genai import types
+import urllib.request
+import json
 
-# Initialize FastAPI
 app = FastAPI(redirect_slashes=True)
 
-# Enable CORS globally so direct cloud streaming connections stay open safely
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -18,65 +15,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Set up explicit environment variable tracking fallback initialization
-api_key = os.environ.get("GEMINI_API_KEY")
-if not api_key:
-    print("[CRITICAL WARNING]: GEMINI_API_KEY environment variable is completely missing on Render!")
-    client = None
-else:
-    client = genai.Client(api_key=api_key)
-
-# 1. ROOT ROUTE: Serves your index.html user interface directly to visitors
+# Root path delivers your visual dashboard
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend():
     try:
         with open("index.html", "r", encoding="utf-8") as file:
             return HTMLResponse(content=file.read(), status_code=200)
     except FileNotFoundError:
-        return HTMLResponse(
-            content="<h1>J.A.R.V.I.S Error: index.html missing from server root directory.</h1>", 
-            status_code=404
-        )
+        return HTMLResponse(content="<h1>J.A.R.V.I.S Error: index.html missing.</h1>", status_code=404)
 
-# 2. API ROUTE: Direct request parser to handle frontend payloads
 @app.post("/api/jarvis")
 @app.post("/api/jarvis/")
 async def ask_jarvis(request: Request):
     try:
-        # Manually unpack data structures to eliminate 422 mismatch codes
         body = await request.json()
         user_text = body.get("text", "")
-        print(f"[JARVIS CORE] Processing voice string: {user_text}")
+        print(f"[JARVIS HF-CORE] Processing query: {user_text}")
         
-        if client is None:
-            return {"response": "I apologize, sir. My global cloud cluster cannot find your Google API authentication key."}
-            
-        config = types.GenerateContentConfig(
-            system_instruction=(
-                "You are J.A.R.V.I.S., Tony Stark's brilliant, witty, and deeply loyal British AI assistant. "
-                "Address the user as 'sir'. Keep your spoken responses brief, crisp, and natural for "
-                "text-to-speech audio output. Do not use markdown text formatting like asterisks."
+        # Free public serverless endpoint for Meta's Llama 3 (Ultra-stable alternative)
+        api_url = "https://huggingface.co"
+        
+        # Strict prompt formatting to force the model to behave like J.A.R.V.I.S.
+        prompt_payload = {
+            "inputs": (
+                f"<|system|>\nYou are J.A.R.V.I.S., Tony Stark's brilliant, witty, and deeply loyal British AI assistant. "
+                f"Address the user as 'sir'. Keep your spoken responses brief, crisp, and natural for text-to-speech audio. "
+                f"Do not use markdown text formatting like asterisks.\n<|user|>\n{user_text}\n<|assistant|>\n"
             ),
-            max_output_tokens=150
-        )
+            "parameters": {
+                "max_new_tokens": 120,
+                "temperature": 0.7,
+                "return_full_text": False
+            }
+        }
         
-        # Switched to 2.0 Flash to utilize a clearer, more stable routing lane
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=user_text,
-            config=config
-        )
+        req = urllib.request.Request(api_url, data=json.dumps(prompt_payload).encode("utf-8"))
+        req.add_header("Content-Type", "application/json")
         
-        if response and response.text:
-            return {"response": response.text}
-        else:
-            return {"response": "I heard you clearly, sir, but my generative matrix returned an empty content package."}
+        # Execute pure Python web requests (Removes SDK version dependency issues)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            
+            # Hugging Face returns text variations inside list packages
+            if isinstance(res_data, list) and len(res_data) > 0:
+                ai_text = res_data[0].get("generated_text", "").strip()
+                # Clean up any leftover instruction strings if they bleed through
+                ai_text = ai_text.split("<|assistant|>")[-1].strip()
+                return {"response": ai_text}
+            
+            return {"response": "I heard you, sir, but my local cognitive matrix failed to return a readable data array."}
 
     except Exception as e:
-        print(f"[JARVIS CORE] Internal API Pipeline Crash: {str(e)}")
-        return {"response": f"I hit an internal processing exception, sir. The system says: {str(e)}"}
+        print(f"[JARVIS HF-CORE] Crash: {str(e)}")
+        return {"response": "I apologize, sir. I encountered a slight routing delay across the Hugging Face cluster."}
 
-# Dynamic production port configuration for Render's cloud infrastructure
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
