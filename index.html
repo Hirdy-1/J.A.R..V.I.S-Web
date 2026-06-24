@@ -128,16 +128,20 @@
         };
 
         recognition.onresult = async (event) => {
-            const userText = event.results.transcript;
+            // Unpack data cleanly out of speech transmission structures
+            const userText = event.results[0][0].transcript;
             logText.innerText = `You: "${userText}"`;
             statusText.innerText = "Analyzing Audio...";
 
             try {
-                // Uses a relative endpoint so it dynamically speaks to the hosting domain automatically
+                // Point directly to relative link addresses to remain in the same cluster domain
                 const response = await fetch('/api/jarvis/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: userText })
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ "text": String(userText) })
                 });
                 
                 if (!response.ok) throw new Error("Endpoint returned invalid data.");
