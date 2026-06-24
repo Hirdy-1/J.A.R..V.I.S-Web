@@ -38,7 +38,7 @@ async def serve_frontend():
             status_code=404
         )
 
-# 2. API ROUTE: Data handler route configuration mapping definitions
+# 2. API ROUTE: Direct request parser to handle frontend payloads
 @app.post("/api/jarvis")
 @app.post("/api/jarvis/")
 async def ask_jarvis(request: Request):
@@ -57,13 +57,12 @@ async def ask_jarvis(request: Request):
                 "Address the user as 'sir'. Keep your spoken responses brief, crisp, and natural for "
                 "text-to-speech audio output. Do not use markdown text formatting like asterisks."
             ),
-            max_output_tokens=120,   # Sliced footprint to bypass high density throttling limits
-            temperature=0.7          # Adjusted variability to distribute network calculation routes
+            max_output_tokens=150
         )
         
-        # Restored back to standard SDK optimized native target mapping
+        # Switched to 2.0 Flash to utilize a clearer, more stable routing lane
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=user_text,
             config=config
         )
