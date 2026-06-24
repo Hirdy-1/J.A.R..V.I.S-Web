@@ -6,10 +6,8 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import types
 
-# Initialize FastAPI
 app = FastAPI(redirect_slashes=True)
 
-# Enable CORS for security consistency
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -18,28 +16,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize the Gemini SDK engine
 client = genai.Client()
 
 class QueryRequest(BaseModel):
     text: str
 
-# 1. ROOT ROUTE: Serves your index.html user interface directly to visitors
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend():
     try:
         with open("index.html", "r", encoding="utf-8") as file:
             return HTMLResponse(content=file.read(), status_code=200)
     except FileNotFoundError:
-        return HTMLResponse(
-            content="<h1>J.A.R.V.I.S Error: index.html missing from server root directory.</h1>", 
-            status_code=404
-        )
+        return HTMLResponse(content="<h1>J.A.R.V.I.S Error: index.html missing.</h1>", status_code=404)
 
-# 2. API ROUTE: Receives transcribed voice strings from the frontend dashboard
 @app.post("/api/jarvis")
 @app.post("/api/jarvis/")
 async def ask_jarvis(request: QueryRequest):
+    # Print the incoming voice command to Render's live dashboard logs
+    print(f"[JARVIS CORE] Processing voice string input: {request.text}")
     try:
         config = types.GenerateContentConfig(
             system_instruction=(
@@ -50,16 +44,26 @@ async def ask_jarvis(request: QueryRequest):
             max_output_tokens=150
         )
         
+        # Call the model via the standard SDK path
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=request.text,
             config=config
         )
-        return {"response": response.text}
+        
+        # SAFE EXTRACT: Verify if valid candidates exist before pulling text
+        if response.candidates and len(response.candidates) > 0:
+            ai_text = response.text
+            print(f"[JARVIS CORE] Success response: {ai_text}")
+            return {"response": ai_text}
+        else:
+            print("[JARVIS CORE] Error: No response candidates found or prompt filtered.")
+            return {"response": "I apologize, sir. My core processors failed to generate a matching verbal response."}
+
     except Exception as e:
+        print(f"[JARVIS CORE] Internal pipeline error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Dynamic production port configuration for Render's cloud infrastructure
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
