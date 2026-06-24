@@ -60,8 +60,9 @@ async def ask_jarvis(request: Request):
             max_output_tokens=150
         )
         
+        # Switched to the highly stable 1.5 model lane to avoid 503 high-demand errors
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',
             contents=user_text,
             config=config
         )
